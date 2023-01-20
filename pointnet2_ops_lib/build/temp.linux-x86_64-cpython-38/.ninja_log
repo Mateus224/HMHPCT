@@ -1,0 +1,10 @@
+# ninja log v5
+0	29003	1667398050457104443	/home/matthias/PCT/PointCloudTransformer/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/ball_query.o	6b57cd4858f0a751
+0	29065	1667398050521104031	/home/matthias/PCT/PointCloudTransformer/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/bindings.o	9711707eef295ca7
+1	29660	1667398051113100223	/home/matthias/PCT/PointCloudTransformer/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/sampling.o	45f26355d2d421b9
+0	30068	1667398051521097599	/home/matthias/PCT/PointCloudTransformer/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/interpolate.o	b685726ad8c55b70
+0	30252	1667398051709096389	/home/matthias/PCT/PointCloudTransformer/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/group_points.o	dca6204054878784
+1	64051	1667398085512878936	/home/matthias/PCT/PointCloudTransformer/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/interpolate_gpu.o	c18e8a6ac76ba63a
+0	64164	1667398085624878216	/home/matthias/PCT/PointCloudTransformer/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/ball_query_gpu.o	b7542d70b588e37b
+0	64257	1667398085716877624	/home/matthias/PCT/PointCloudTransformer/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/group_points_gpu.o	2603768085e999d2
+1	65750	1667398087208868027	/home/matthias/PCT/PointCloudTransformer/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/sampling_gpu.o	9bffb4ae34f6c9cf

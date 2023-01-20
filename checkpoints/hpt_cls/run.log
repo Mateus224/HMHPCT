@@ -1,0 +1,28 @@
+Namespace(batch_size=32, dataset='modelnet40', dropout=0.5, epochs=250, eval=False, exp_name='hpt_cls', lr=0.0001, model='hmt', model_path='', momentum=0.9, no_cuda=False, num_points=1024, seed=1, test_batch_size=16, use_sgd=True)
+Using GPU : 0 from 1 devices
+Namespace(batch_size=32, dataset='modelnet40', dropout=0.5, epochs=250, eval=False, exp_name='hpt_cls', lr=0.0001, model='hmt', model_path='', momentum=0.9, no_cuda=False, num_points=1024, seed=1, test_batch_size=16, use_sgd=True)
+Using GPU : 0 from 1 devices
+Namespace(batch_size=32, dataset='modelnet40', dropout=0.5, epochs=250, eval=False, exp_name='hpt_cls', lr=0.0001, model='hmt', model_path='', momentum=0.9, no_cuda=False, num_points=1024, seed=1, test_batch_size=16, use_sgd=True)
+Using GPU : 0 from 1 devices
+Namespace(batch_size=32, dataset='modelnet40', dropout=0.5, epochs=250, eval=False, exp_name='hpt_cls', lr=0.0001, model='hmt', model_path='', momentum=0.9, no_cuda=False, num_points=1024, seed=1, test_batch_size=16, use_sgd=True)
+Using GPU : 0 from 1 devices
+Train 0, loss: 3.546610, train acc: 0.100265, train avg acc: 0.043420
+Test 0, loss: 3.480760, test acc: 0.098460, test avg acc: 0.060750
+Train 1, loss: 3.497763, train acc: 0.109528, train avg acc: 0.046788
+Test 1, loss: 3.512331, test acc: 0.108590, test avg acc: 0.067000
+Train 2, loss: 3.497320, train acc: 0.110444, train avg acc: 0.046849
+Test 2, loss: 3.718333, test acc: 0.055916, test avg acc: 0.034500
+Namespace(batch_size=32, dataset='modelnet40', dropout=0.5, epochs=250, eval=False, exp_name='hpt_cls', lr=0.0001, model='hmt', model_path='', momentum=0.9, no_cuda=False, num_points=1024, seed=1, test_batch_size=16, use_sgd=True)
+Using GPU : 0 from 1 devices
+Train 0, loss: 3.490912, train acc: 0.134263, train avg acc: 0.053770
+Test 0, loss: 3.456692, test acc: 0.109806, test avg acc: 0.067750
+Train 1, loss: 3.396873, train acc: 0.156250, train avg acc: 0.068258
+Test 1, loss: 16.072935, test acc: 0.040519, test avg acc: 0.025000
+Train 2, loss: nan, train acc: 0.078990, train avg acc: 0.030390
+Test 2, loss: nan, test acc: 0.040519, test avg acc: 0.025000
+Namespace(batch_size=32, dataset='modelnet40', dropout=0.5, epochs=250, eval=False, exp_name='hpt_cls', lr=0.0001, model='hmt', model_path='', momentum=0.9, no_cuda=False, num_points=1024, seed=1, test_batch_size=16, use_sgd=True)
+Using GPU : 0 from 1 devices
+Namespace(batch_size=32, dataset='modelnet40', dropout=0.5, epochs=250, eval=False, exp_name='hpt_cls', lr=0.0001, model='hmt', model_path='', momentum=0.9, no_cuda=False, num_points=1024, seed=1, test_batch_size=16, use_sgd=True)
+Using GPU : 0 from 1 devices
+Train 0, loss: 2.990467, train acc: 0.317182, train avg acc: 0.164087
+Test 0, loss: 2.433959, test acc: 0.485413, test avg acc: 0.331860
