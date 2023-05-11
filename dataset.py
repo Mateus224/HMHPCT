@@ -10,7 +10,7 @@ def download():
     DATA_DIR = os.path.join(BASE_DIR, 'data')
     if not os.path.exists(DATA_DIR):
         os.mkdir(DATA_DIR)
-    if not os.path.exists(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048')):
+    if not os.path.exists(os.path.join(DATA_DIR, 'shapenetpart')):
         www = 'https://shapenet.cs.stanford.edu/media/modelnet40_ply_hdf5_2048.zip'
         zipfile = os.path.basename(www)
         os.system('wget --no-check-certificate %s; unzip %s' % (www, zipfile))
@@ -24,16 +24,20 @@ def load_data(partition):
     DATA_DIR = os.path.join(BASE_DIR, 'data')  # you can modify here to assign the path where dataset's root located at
     all_data = []
     all_label = []
-    for h5_name in glob.glob(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048', 'ply_data_%s*.h5' % partition)):
+    all_class = []
+    for h5_name in glob.glob(os.path.join(DATA_DIR, 'shapenetpart', 'ply_data_%s*.h5' % partition)):
         f = h5py.File(h5_name)
         data = f['data'][:].astype('float32')
-        label = f['label'][:].astype('int64')
+        class_ = f['label'][:].astype('int64')
+        label = f['pid'][:].astype('int64')
         f.close()
         all_data.append(data)
         all_label.append(label)
+        all_class.append(class_)
     all_data = np.concatenate(all_data, axis=0)
     all_label = np.concatenate(all_label, axis=0)
-    return all_data, all_label
+    all_class = np.concatenate(all_class, axis=0)
+    return all_data, all_label, all_class
 
 
 def random_point_dropout(pc, max_dropout_ratio=0.875):
@@ -64,18 +68,19 @@ def jitter_pointcloud(pointcloud, sigma=0.01, clip=0.02):
 
 class ModelNet40(Dataset):
     def __init__(self, num_points, partition='train'):
-        self.data, self.label = load_data(partition)
+        self.data, self.label, self.class_ = load_data(partition)
         self.num_points = num_points
         self.partition = partition        
 
     def __getitem__(self, item):
         pointcloud = self.data[item][:self.num_points]
-        label = self.label[item]
+        label = self.label[item][:self.num_points]
+        class_ = self.class_[item]
         if self.partition == 'train':
             pointcloud = random_point_dropout(pointcloud) # open for dgcnn not for our idea  for all
             pointcloud = translate_pointcloud(pointcloud)
             np.random.shuffle(pointcloud)
-        return pointcloud, label
+        return pointcloud, label, class_
 
     def __len__(self):
         return self.data.shape[0]

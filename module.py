@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import numpy as np
 from util import sample_and_knn_group
 
 
@@ -31,6 +31,54 @@ class Embedding(nn.Module):
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         return x
+
+class EmbeddingV2(nn.Module):
+    """
+    Input Embedding layer which consist of 2 stacked LBR layer.
+    """
+
+    def __init__(self, in_channels=3, out_channels=256):
+        super(EmbeddingV2, self).__init__()
+
+        self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=False)
+        self.conv20 = nn.Conv1d(out_channels, out_channels//8, kernel_size=1, bias=False)
+        self.conv21 = nn.Conv1d(out_channels, out_channels//8, kernel_size=1, bias=False)
+        self.conv22 = nn.Conv1d(out_channels, out_channels//8, kernel_size=1, bias=False)
+        self.conv23 = nn.Conv1d(out_channels, out_channels//8, kernel_size=1, bias=False)
+        self.conv24 = nn.Conv1d(out_channels, out_channels//8, kernel_size=1, bias=False)
+        self.conv25 = nn.Conv1d(out_channels, out_channels//8, kernel_size=1, bias=False)
+        self.conv26 = nn.Conv1d(out_channels, out_channels//8, kernel_size=1, bias=False)
+        self.conv27 = nn.Conv1d(out_channels, out_channels//8, kernel_size=1, bias=False)
+
+        self.bn1 = nn.BatchNorm1d(out_channels)
+        self.bn20 = nn.BatchNorm1d(out_channels//8)
+        self.bn21 = nn.BatchNorm1d(out_channels//8)
+        self.bn22 = nn.BatchNorm1d(out_channels//8)
+        self.bn23 = nn.BatchNorm1d(out_channels//8)
+        self.bn24 = nn.BatchNorm1d(out_channels//8)
+        self.bn25 = nn.BatchNorm1d(out_channels//8)
+        self.bn26 = nn.BatchNorm1d(out_channels//8)
+        self.bn27 = nn.BatchNorm1d(out_channels//8)
+
+
+    def forward(self, x):
+        """
+        Input
+            x: [B, in_channels, N]
+        
+        Output
+            x: [B, out_channels, N]
+        """
+        x = F.relu(self.bn1(self.conv1(x)))
+        x0 = F.relu(self.bn20(self.conv20(x)))
+        x1 = F.relu(self.bn21(self.conv21(x)))
+        x2 = F.relu(self.bn22(self.conv22(x)))
+        x3 = F.relu(self.bn23(self.conv23(x)))
+        x4 = F.relu(self.bn24(self.conv24(x)))
+        x5 = F.relu(self.bn25(self.conv25(x)))
+        x6 = F.relu(self.bn26(self.conv26(x)))
+        x7 = F.relu(self.bn27(self.conv27(x)))
+        return x0,x1,x2,x3,x4,x5,x6,x7
 
 
 class SA(nn.Module):
@@ -96,7 +144,7 @@ class SG(nn.Module):
         self.bn1 = nn.BatchNorm1d(out_channels)
         self.bn2 = nn.BatchNorm1d(out_channels)
     
-    def forward(self, x, coords):
+    def forward(self, x, coords, k):
         """
         Input:
             x: features with size of [B, in_channels//2, N]
@@ -109,10 +157,73 @@ class SG(nn.Module):
         new_feature = new_feature.reshape(-1, d, k)                               # [Bxs, in_channels, 32]
         batch_size = new_feature.size(0)
         new_feature = F.relu(self.bn1(self.conv1(new_feature)))                   # [Bxs, in_channels, 32]
-        new_feature = F.relu(self.bn2(self.conv2(new_feature)))                   # [Bxs, in_channels, 32]
+        new_feature = F.relu(self.bn2(self.conv2(new_feature)))                 # [Bxs, in_channels, 32]
         new_feature = F.adaptive_max_pool1d(new_feature, 1).view(batch_size, -1)  # [Bxs, in_channels]
         new_feature = new_feature.reshape(b, s, -1).permute(0, 2, 1)              # [B, in_channels, s]
         return new_xyz, new_feature
+
+
+class OwnPCT(nn.Module):
+    def __init__(self, samples=[256, 128, 64]):
+        super(OwnPCT, self).__init__()
+
+        self.conv1 = nn.Conv1d(3, 64, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(64, 64, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm1d(64)
+        self.bn2 = nn.BatchNorm1d(64)
+
+        self.sg1 = SG(s=256, in_channels=128, out_channels=128)#192
+        self.oa02 = OA_1a(64) #256->128
+        self.sg2 = SG(s=64, in_channels=256, out_channels=256)#384
+        self.oa03 = OA_1a(64) #256->128
+        
+
+        self.oas1 =OA_2(256)
+        self.oa04 = OA(64)
+        self.oas2 =OA_2(128) 
+        self.oa1 = OA(64)
+        self.oa2 = OA(64)       
+        self.oa3 = OA(64)  
+        self.oa4 = OA(64)
+
+
+        self.linear = nn.Sequential(
+            nn.Conv1d(320, 320, kernel_size=1, bias=False),
+            nn.BatchNorm1d(320),
+            nn.LeakyReLU(negative_slope=0.2)
+        )
+
+    def forward(self, x):
+        """
+        Input:
+            x: [B, 3, N]
+        """
+        xyz = x.permute(0, 2, 1)  # [B, N ,3]
+
+        x = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
+        x0 = F.relu(self.bn2(self.conv2(x))) # [B, 64, N]
+
+        xyz1, features1 = self.sg1(x, xyz, k=32)         # [B, 128, 512]
+        #features1=self.oa02(features1,x0)
+
+        xyz1, features2 = self.sg2(features1, xyz1, k=32)         # [B, 128, 512]
+        #features2=self.oa03(features2,features1)
+     
+        x = self.oas1(features2, features1)
+        #x = self.oa04(x)
+
+        x1 = self.oas2(x, x0)
+        #x1 = x
+        x2 = self.oa1(x1)
+        x3 = self.oa2(x2)
+        x4 = self.oa3(x2)
+        x5 = self.oa4(x3)
+        #x5 = self.oa34(x4)
+        x = torch.cat([x1, x2, x3, x4, x5], dim=1)
+        x = self.linear(x)
+        x_max = torch.max(x, dim=-1)[0]
+        x_mean = torch.mean(x, dim=-1)
+        return x, x_max, x_mean
 
 
 class NeighborEmbedding(nn.Module):
@@ -137,12 +248,170 @@ class NeighborEmbedding(nn.Module):
         features = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
         features = F.relu(self.bn2(self.conv2(features))) # [B, 64, N]
 
-        xyz1, features1 = self.sg1(features, xyz)         # [B, 128, 512]
-        _, features2 = self.sg2(features1, xyz1)          # [B, 256, 256]
+        xyz1, features1 = self.sg1(features, xyz, 32)         # [B, 128, 512]
+        xyz, features2 = self.sg2(features1, xyz1, 32)          # [B, 256, 256]
 
-        return features2
+        return xyz, features2
+
+class NeighborEmbeddingHigher(nn.Module):
+    def __init__(self, samples=256):
+        super(NeighborEmbeddingHigher, self).__init__()
+        features=int(1024/samples)*8
+        #fe= int(features/2)
+        self.conv1 = nn.Conv1d(3, features, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(features, features, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm1d(features)
+        self.bn2 = nn.BatchNorm1d(features)
+
+        self.sg1 = SG(s=samples, in_channels=features*2, out_channels=features*2-3)
+        #self.sg2 = SG(s=samples, in_channels=288, out_channels=288)
+        
+    def forward(self, x):
+        """
+        Input:
+            x: [B, 3, N]
+        """
+        xyz = x.permute(0, 2, 1)  # [B, N ,3]
+
+        features = F.relu(self.bn1(self.conv1(x)))        # [B, 64, N]
+        features = F.relu(self.bn2(self.conv2(features))) # [B, 64, N]
+
+        xyz, features = self.sg1(features, xyz)         # [B, 128, 512]
+        #xyz, features2 = self.sg2(features1, xyz1)          # [B, 256, 256]
+        #print(xyz.shape, features.shape)
+        
+        xyz = xyz.permute(0, 2, 1)
+        features = torch.cat([xyz, features] ,dim=1)
+        #print(features.shape)
+        
+
+        return xyz, features
 
 
+class OA_1a(nn.Module):
+    """
+    Offset-Attention Module.
+    """
+    
+    def __init__(self, channels):
+        super(OA_1a, self).__init__()
+        
+        self.q_conv = nn.Conv1d(channels, channels, 1, bias=False)
+        self.k_conv = nn.Conv1d(channels, channels , 1, bias=False)
+        self.q_conv.weight = self.k_conv.weight
+        self.v_conv = nn.Conv1d(channels, channels, 1)
+
+        self.trans_conv = nn.Conv1d(channels, channels, 1)
+        self.after_norm = nn.BatchNorm1d(channels)
+        self.dp1 = nn.Dropout(p=0.2)
+        self.act = nn.ReLU()
+        self.softmax = nn.Softmax(dim=-1)  # change dim to -2 and change the sum(dim=1, keepdims=True) to dim=2
+
+    def forward(self, x, q):
+        """
+        Input:
+            x: [B, de, N]
+        
+        Output:
+            x: [B, de, N]
+        """
+        x_q = self.q_conv(q).permute(0, 2, 1)
+        x_k = self.k_conv(x)    
+        x_v = self.v_conv(q)
+
+        energy = torch.bmm(x_q, x_k)
+        attention = self.softmax(energy)
+        attention = attention / (1e-9 + attention.sum(dim=1, keepdims=True))  # here
+        x_r = torch.bmm(x_v, attention)
+        #x_r = self.dp1(x_r)
+        x_r = self.act(self.after_norm(self.trans_conv(x - x_r)))
+        x = x + x_r
+
+        return x
+        
+
+class OA_2a(nn.Module):
+    """
+    Offset-Attention Module.
+    """
+    
+    def __init__(self, channels_m):
+        super(OA_2a, self).__init__()
+
+        #q= 32 256
+        #k= 128   128
+
+        self.q_conv = nn.Conv1d(channels_m, channels_m , 1, bias=False)
+        self.k_conv = nn.Conv1d(channels_m, channels_m, 1, bias=False)
+        self.v_conv = nn.Conv1d(channels_m, channels_m , 1)
+        self.trans_conv = nn.Conv1d(channels_m , channels_m , 1)
+        self.after_norm = nn.BatchNorm1d(channels_m)
+        
+        self.act = nn.ReLU()
+        self.softmax = nn.Softmax(dim=-1)  # change dim to -2 and change the sum(dim=1, keepdims=True) to dim=2
+
+    def forward(self,q, x):
+        """
+        Input:
+            x: [B, de, N]
+        
+        Output:
+            x: [B, de, N]
+        """
+        x_q = self.q_conv(q).permute(0, 2, 1)
+        
+        x_k = self.k_conv(x)    
+        x_v = self.v_conv(q)
+        energy = torch.bmm(x_q, x_k)
+        attention = self.softmax(energy)
+        attention = attention / (1e-9 + attention.sum(dim=1, keepdims=True))  # here
+        x_r = torch.bmm(x_v, attention)
+        x_r = self.act(self.after_norm(self.trans_conv(x-x_r)))
+        x = x_r+ x
+        return x
+       
+
+class OA_2(nn.Module):
+    """
+    Offset-Attention Module.
+    """
+    
+    def __init__(self, channels_m):
+        super(OA_2, self).__init__()
+
+        #q= 32 256
+        #k= 128   128
+
+        self.q_conv = nn.Conv1d(channels_m, channels_m//2 , 1, bias=False)
+        self.k_conv = nn.Conv1d(channels_m//2, channels_m//2, 1, bias=False)
+        self.v_conv = nn.Conv1d(channels_m, channels_m//2 , 1)
+        self.trans_conv = nn.Conv1d(channels_m//2 , channels_m//2 , 1)
+        self.after_norm = nn.BatchNorm1d(channels_m//2)
+        
+        self.act = nn.ReLU()
+        self.softmax = nn.Softmax(dim=-1)  # change dim to -2 and change the sum(dim=1, keepdims=True) to dim=2
+
+    def forward(self,q, x):
+        """
+        Input:
+            x: [B, de, N]
+        
+        Output:
+            x: [B, de, N]
+        """
+        x_q = self.q_conv(q).permute(0, 2, 1)
+        
+        x_k = self.k_conv(x)    
+        x_v = self.v_conv(q)
+        energy = torch.bmm(x_q, x_k)
+        attention = self.softmax(energy)
+        attention = attention / (1e-9 + attention.sum(dim=1, keepdims=True))  # here
+        x_r = torch.bmm(x_v, attention)
+        x_r = self.act(self.after_norm(self.trans_conv(x-x_r)))
+        x = x_r+ x
+        return x
+
+ 
 class OA(nn.Module):
     """
     Offset-Attention Module.
@@ -158,7 +427,7 @@ class OA(nn.Module):
 
         self.trans_conv = nn.Conv1d(channels, channels, 1)
         self.after_norm = nn.BatchNorm1d(channels)
-        
+        self.dp1 = nn.Dropout(p=0.2)
         self.act = nn.ReLU()
         self.softmax = nn.Softmax(dim=-1)  # change dim to -2 and change the sum(dim=1, keepdims=True) to dim=2
 
@@ -179,8 +448,54 @@ class OA(nn.Module):
         attention = attention / (1e-9 + attention.sum(dim=1, keepdims=True))  # here
 
         x_r = torch.bmm(x_v, attention)
+        #x_r = self.dp1(x_r)
         x_r = self.act(self.after_norm(self.trans_conv(x - x_r)))
         x = x + x_r
+
+        return x
+        
+class OAQ(nn.Module):
+    """
+    Offset-Attention Module.
+    """
+    
+    def __init__(self, channels):
+        super(OAQ, self).__init__()
+        self.q_conv = nn.Conv1d(channels, channels , 1, bias=False)
+        self.k_conv = nn.Conv1d(channels, channels , 1, bias=False)
+        self.q_conv.weight = self.k_conv.weight
+        self.v_conv = nn.Conv1d(channels, channels , 1)
+        #self.q_conv = nn.Conv1d(3, 64 , 1, bias=False)
+        #self.k_conv = nn.Conv1d(3, 64 , 1, bias=False)
+        #self.q_conv.weight = self.k_conv.weight
+        #self.v_conv = nn.Conv1d(channels, channels, 1)
+
+        self.trans_conv = nn.Conv1d(channels , channels , 1)
+        self.after_norm = nn.BatchNorm1d(channels)
+        
+        self.act = nn.ReLU()
+        self.softmax = nn.Softmax(dim=-1)  # change dim to -2 and change the sum(dim=1, keepdims=True) to dim=2
+
+    def forward(self, q,  x):
+        """
+        Input:
+            x: [B, de, N]
+        
+        Output:
+            x: [B, de, N]
+        """
+        x_q = self.q_conv(q).permute(0, 2, 1)
+        
+        x_k = self.k_conv(x)    
+        x_v = self.v_conv(x)
+
+        energy = torch.bmm(x_q, x_k)
+        attention = self.softmax(energy)
+        attention = attention / (1e-9 + attention.sum(dim=1, keepdims=True))  # here
+
+        x_r = torch.bmm(x_v, attention)
+        x_r = self.act(self.after_norm(self.trans_conv(q - x_r)))
+        x = q + x_r
 
         return x
 
@@ -201,9 +516,9 @@ class OAO(nn.Module):
         #self.q_conv.weight = self.k_conv.weight
         #self.v_conv = nn.Conv1d(channels, channels, 1)
 
-        self.trans_conv = nn.Conv1d(channels // 2, channels // 2, 1)
-        self.after_norm = nn.BatchNorm1d(channels // 2)
-        
+        self.trans_conv = nn.Conv1d(channels // 4, channels // 4, 1)
+        self.after_norm = nn.BatchNorm1d(channels // 4)
+        self.dp1 = nn.Dropout(p=0.2)
         self.act = nn.ReLU()
         self.softmax = nn.Softmax(dim=-1)  # change dim to -2 and change the sum(dim=1, keepdims=True) to dim=2
 
@@ -226,6 +541,7 @@ class OAO(nn.Module):
         x_r = torch.bmm(x_v, attention)
         #x_r = self.act(self.after_norm(self.trans_conv(x - x_r)))
         #x = x + x_r
+        #x_r = self.dp1(x_r) 
         x = self.act(self.after_norm(self.trans_conv(x_r)))
 
         return x

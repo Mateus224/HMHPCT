@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from module import Embedding, NeighborEmbedding, OA, SA, OAO
+from module import Embedding, EmbeddingV2, OwnPCT, NeighborEmbedding,NeighborEmbeddingHigher, OA, OAQ, SA, OAO
 
 
 class NaivePCT(nn.Module):
@@ -74,7 +74,6 @@ class SPCT(nn.Module):
 
         return x, x_max, x_mean
 
-
 class PCT(nn.Module):
     def __init__(self, samples=[512, 256]):
         super().__init__()
@@ -93,7 +92,7 @@ class PCT(nn.Module):
         )
 
     def forward(self, x):
-        x = self.neighbor_embedding(x)
+        _, x = self.neighbor_embedding(x)
 
         x1 = self.oa1(x)
         x2 = self.oa2(x1)
@@ -110,102 +109,41 @@ class PCT(nn.Module):
 
         return x, x_max, x_mean
 
-class HmultiT(nn.Module):
-    def __init__(self, samples=[512, 256]):
+class PCT_own(nn.Module):
+    def __init__(self, samples=[512, 256, 128, 64]):
         super().__init__()
 
-        self.neighbor_embedding = Embedding()
-        self.oa11 = OAO(64)
-        self.oa12 = OAO(64)
-        self.oa13 = OAO(64)
-        self.oa14 = OAO(64)
+        self.neighbor_embedding = NeighborEmbedding_own(samples)
+        
 
-        self.oa21 = OA(192)
-        self.oa22 = OAO(192)
-
-        self.oa23 = OA(192)
-        self.oa24 = OAO(192)
-
-        self.oa31 = OA(960)
-        self.oa32 = OAO(960)
-
-
-
-        self.linearLayer_weights_11 = nn.Conv1d(384, 384, kernel_size=1, bias=False)
-        self.linearLayer_weights_12 = nn.Conv1d(384, 384, kernel_size=1, bias=False)
-
-        self.linearLayer_weights_2 = nn.Conv1d(960, 960, kernel_size=1, bias=False)
-        self.linearLayer_weights_3 = nn.Conv1d(2400, 1024, kernel_size=1, bias=False)
-        self.linearLayer_weights_4 = nn.Conv1d(320, 64, kernel_size=1, bias=False)
-
-        self.linearLayer_1 = nn.Sequential(
-            nn.Conv1d(256, 256, kernel_size=1, bias=False),
-            nn.BatchNorm1d(256),
+        self.linear = nn.Sequential(
+            nn.Conv1d(1280, 1024, kernel_size=1, bias=False),
+            nn.BatchNorm1d(1024),
             nn.LeakyReLU(negative_slope=0.2)
         )
-        self.Hoa=OA(256)
-
-        self.linearLayer_2 = nn.Sequential(
-            nn.Conv1d(256, 256, kernel_size=1, bias=False),
-            nn.BatchNorm1d(256),
-            nn.LeakyReLU(negative_slope=0.2)
-        )
-
 
     def forward(self, x):
-        x = self.neighbor_embedding(x)
+        x, max_x = self.neighbor_embedding(x)
+        #x_max = torch.max(x, dim=-1)[0]
+        #x_mean = torch.mean(x, dim=-1)
 
-        x01 = x.narrow(1,0,64)
-        x02 = x.narrow(1,64,64)
-        x03 = x.narrow(1,128,64)
-        x04 = x.narrow(1,192,64)
- 
-        x11 = self.oa11(x01)
-        x12 = self.oa12(x02)
-        x13 = self.oa13(x03)
-        x14 = self.oa14(x04)
+        return x, max_x
 
 
-        x_cat1 = torch.cat([x, x11, x12, x13, x14], dim=1)
-        #print(x_cat1.shape)
-        #x_cat2 = torch.cat([x03, x04, x13, x14], dim=1)
 
-        x_11 =  F.relu(self.linearLayer_weights_11(x_cat1))
-        #x_12 =  F.relu(self.linearLayer_weights_12(x_cat2))
 
-        x01 = x_11.narrow(1,0,192)
-        x02 = x_11.narrow(1,192,192)
-
-        x1 = self.oa21(x01)
-        x2 = self.oa22(x1)
-
-        x3 = self.oa23(x02)
-        x4 = self.oa24(x3)        
-
-        x_cat = torch.cat([x_11, x1, x2, x3, x4], dim=1)
-        x =  F.relu(self.linearLayer_weights_2(x_cat))
-
-        x1 = self.oa31(x)
-        x2 = self.oa32(x1)
-
-        x_cat = torch.cat([x, x1, x2], dim=1)
-        x =  F.relu(self.linearLayer_weights_3(x_cat))
-        x_max = torch.max(x, dim=-1)[0]
-        x_mean = torch.mean(x, dim=-1)
-
-        return x , x_max, x_mean
 
 
 class Classification(nn.Module):
     def __init__(self, num_categories=40):
         super().__init__()
 
-        self.linear1 = nn.Linear(1024, 512, bias=False)
-        self.linear2 = nn.Linear(512, 256)
-        self.linear3 = nn.Linear(256, num_categories)
+        self.linear1 = nn.Linear(480, 256, bias=False)
+        self.linear2 = nn.Linear(256, 128)
+        self.linear3 = nn.Linear(128, num_categories)
 
-        self.bn1 = nn.BatchNorm1d(512)
-        self.bn2 = nn.BatchNorm1d(256)
+        self.bn1 = nn.BatchNorm1d(256)
+        self.bn2 = nn.BatchNorm1d(128)
 
         self.dp1 = nn.Dropout(p=0.5)
         self.dp2 = nn.Dropout(p=0.5)
@@ -223,19 +161,19 @@ class Segmentation(nn.Module):
     def __init__(self, part_num):
         super().__init__()
 
-        self.part_num = part_num
+        self.part_num = 50
 
         self.label_conv = nn.Sequential(
-            nn.Conv1d(16, 64, kernel_size=1, bias=False),
-            nn.BatchNorm1d(64),
+            nn.Conv1d(16, 512, kernel_size=1, bias=False),
+            nn.BatchNorm1d(512),
             nn.LeakyReLU(negative_slope=0.2)
         )
 
-        self.convs1 = nn.Conv1d(1024 * 3 + 64, 512, 1)
-        self.convs2 = nn.Conv1d(512, 256, 1)
+        self.convs1 = nn.Conv1d(1472, 1024, 1)
+        self.convs2 = nn.Conv1d(1024, 256, 1)
         self.convs3 = nn.Conv1d(256, self.part_num, 1)
 
-        self.bns1 = nn.BatchNorm1d(512)
+        self.bns1 = nn.BatchNorm1d(1024)
         self.bns2 = nn.BatchNorm1d(256)
 
         self.dp1 = nn.Dropout(0.5)
@@ -245,17 +183,20 @@ class Segmentation(nn.Module):
 
         x_max_feature = x_max.unsqueeze(-1).repeat(1, 1, N)
         x_mean_feature = x_mean.unsqueeze(-1).repeat(1, 1, N)
-
-        cls_label_one_hot = cls_label.view(batch_size, 16, 1)
-        cls_label_feature = self.label_conv(cls_label_one_hot).repeat(1, 1, N)
-
-        x = torch.cat([x, x_max_feature, x_mean_feature, cls_label_feature], dim=1)  # 1024 * 3 + 64
+        #print(cls_label.shape,'cls_label')
+        #cls_label_one_hot = cls_label.view(batch_size, 983040, 1)
+        #print(cls_label.shape)
+        #cls_label_one_hot = cls_label.view(batch_size, 16, 1)
+        #cls_label_feature = self.label_conv(cls_label_one_hot).repeat(1, 1, N)
+        cls_label_feature = self.label_conv(cls_label.float()).repeat(1, 1, N)
+        #print(x.shape,cls_label_feature.shape)
+        x = torch.cat([x, x_max_feature,x_mean_feature, cls_label_feature], dim=1)  # 1024 * 3 + 64
 
         x = F.relu(self.bns1(self.convs1(x)))
         x = self.dp1(x)
         x = F.relu(self.bns2(self.convs2(x)))
         x = self.convs3(x)
-
+        #print(x.shape, 'xxx')
         return x
 
 
@@ -333,11 +274,11 @@ class PCTCls(nn.Module):
 class HirarchicalPT(nn.Module):
     def __init__(self, num_categories=40):
         super().__init__()
-        self.encoder = HmultiT()
+        self.encoder = PCT_own()
         self.cls = Classification(num_categories)
     
     def forward(self, x):
-        _, x, _ = self.encoder(x)
+        _, x = self.encoder(x)
         x = self.cls(x)
         return x
 """
@@ -347,13 +288,15 @@ Part Segmentation Networks.
 class NaivePCTSeg(nn.Module):
     def __init__(self, part_num=50):
         super().__init__()
-    
-        self.encoder = NaivePCT()
+        #self.encoder =  PCT(samples=[1024, 1024])
+        #self.encoder = NaivePCT()
+        self.encoder =OwnPCT()
         self.seg = Segmentation(part_num)
 
     def forward(self, x, cls_label):
         x, x_max, x_mean = self.encoder(x)
         x = self.seg(x, x_max, x_mean, cls_label)
+        #print(x.shape,'asd')
         return x
 
 

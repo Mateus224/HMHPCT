@@ -3,14 +3,19 @@ import torch.nn.functional as F
 from pointnet2_ops import pointnet2_utils
 
 
-def cal_loss(pred, ground_truth, smoothing=True):
+def cal_loss(pred, ground_truth, smoothing=False):
     ''' Calculate cross entropy loss, apply label smoothing if needed. '''
-
-    ground_truth = ground_truth.contiguous().view(-1)
-
+    
+    #ground_truth = ground_truth.contiguous().view(-1)
+    
+    pred=pred.float()
+    ground_truth=ground_truth.float()
+    #print(pred.shape, ground_truth.shape)
+    #print(ground_truth.shape, pred.shape)
     if smoothing:
         eps = 0.2
         n_class = pred.size(1)
+        
 
         one_hot = torch.zeros_like(pred).scatter(1, ground_truth.view(-1, 1), 1)
         one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (n_class - 1)
@@ -165,13 +170,16 @@ def sample_and_knn_group(s, k, coords, features):
 
     # FPS sampling
     fps_idx = pointnet2_utils.furthest_point_sample(coords, s).long()  # [B, s]
-    new_coords = index_points(coords, fps_idx)                         # [B, s, 3]
+    #print(coords)
+    new_coords = index_points(coords, fps_idx)           # [B, s, 3]
     new_features = index_points(features, fps_idx)                     # [B, s, D]
-
     # K-nn grouping
-    idx = knn_point(k, coords, new_coords)                                              # [B, s, k]
+    idx = knn_point(k, coords, new_coords)      
+    #print(idx[0,:,:],'k')
+    #grouped_points = index_points(coords,idx)     
+    #print(grouped_points.shape)                                   # [B, s, k]
     grouped_features = index_points(features, idx)                                      # [B, s, k, D]
-    
+    #print(grouped_features[0,0,:,0])
     # Matrix sub
     grouped_features_norm = grouped_features - new_features.view(batch_size, s, 1, -1)  # [B, s, k, D]
 
