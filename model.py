@@ -164,17 +164,17 @@ class Segmentation(nn.Module):
         self.part_num = 50
 
         self.label_conv = nn.Sequential(
-            nn.Conv1d(16, 512, kernel_size=1, bias=False),
-            nn.BatchNorm1d(512),
+            nn.Conv1d(16, 64, kernel_size=1, bias=False),
+            nn.BatchNorm1d(64),
             nn.LeakyReLU(negative_slope=0.2)
         )
 
-        self.convs1 = nn.Conv1d(1472, 1024, 1)
-        self.convs2 = nn.Conv1d(1024, 256, 1)
-        self.convs3 = nn.Conv1d(256, self.part_num, 1)
+        self.convs1 = nn.Conv1d(1984, 256, 1)
+        self.convs2 = nn.Conv1d(256, 64, 1)
+        self.convs3 = nn.Conv1d(64, self.part_num, 1)
 
-        self.bns1 = nn.BatchNorm1d(1024)
-        self.bns2 = nn.BatchNorm1d(256)
+        self.bns1 = nn.BatchNorm1d(256)
+        self.bns2 = nn.BatchNorm1d(64)
 
         self.dp1 = nn.Dropout(0.5)
     

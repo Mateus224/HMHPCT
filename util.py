@@ -150,6 +150,33 @@ def sample_and_ball_group(s, radius, n, coords, features):
 
     return new_coords, aggregated_features  # [B, s, 3], [B, s, n, 2D]
 
+def knn_group(s, k, coords, features):
+    """
+    Sampling by FPS and grouping by KNN.
+    Input:
+        s[int]: number of points to be sampled by FPS
+        k[int]: number of points to be grouped into a neighbor by KNN
+        coords[tensor]: input points coordinates data with size of [B, N, 3]
+        features[tensor]: input points features data with size of [B, N, D]
+    
+    Returns:
+        new_coords[tensor]: sampled and grouped points coordinates by FPS with size of [B, s, k, 3]
+        new_features[tensor]: sampled and grouped points features by FPS with size of [B, s, k, 2D]
+    """
+
+    batch_size = coords.shape[0]
+    coords = coords.contiguous()
+
+    # K-nn grouping
+    idx = knn_point(k, coords, coords)                                       # [B, s, k]
+
+    grouped_features = index_points(features, idx)
+
+    grouped_features_norm = grouped_features - features.view(batch_size, s, 1, -1)  # [B, s, k, D]
+    aggregated_features = torch.cat([grouped_features_norm, features.view(batch_size, s, 1, -1).repeat(1, 1, k, 1)], dim=-1) 
+
+    return  aggregated_features
+
 
 def sample_and_knn_group(s, k, coords, features):
     """
